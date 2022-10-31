@@ -1,4 +1,5 @@
 require 'yaml'
+require 'socket'
 
 class Runner
   REPORTER = '--format pretty -f Formatter -o abc.txt'
@@ -24,6 +25,32 @@ class Runner
 
   def get_project_name
     return @input_params['projectName'] unless @input_params['projectName'].nil?
+  end
+  
+  def get_host_machine_info
+    {
+      'hostname' => Socket.gethostname,
+      'platform' => Gem::Platform.local.os,
+      'type' => Gem::Platform.local.cpu,
+      'version' => Gem::Platform.local.version,
+      'arch' => Gem::Platform.local.cpu
+    }
+  end
+
+  def get_description
+    'Dummy Description'
+  end
+
+  def get_ci_info
+    'Dummy Info'
+  end
+
+  def get_failed_test_rerun
+    false
+  end
+
+  def version_control
+    'Dummy Meta Data'
   end
 
   def create_cmd

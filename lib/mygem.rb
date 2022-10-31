@@ -1,4 +1,5 @@
 require_relative 'runner'
+require 'pry'
 
 class Mygem
   def custom_formatter(config, ast)
@@ -25,30 +26,30 @@ class Mygem
   end
 
   def on_test_case_started(event)
-    puts "inside on_test_case_started - #{event}"
+    puts "LOCAL GEM - inside on_test_case_started - #{event}"
+    start_time = current_time
     test_case = event.test_case
     scenario = @ast_lookup.scenario_source(test_case)
     @scenario_name = get_scenario_name(scenario)
     @tags_array = get_tags_array(test_case.tags)
-    puts "tags_array - #{@tags_array}, scenario_name - #{@scenario_name}"
-    response_data = create_build_response
+    response_data = create_build_response(start_time)
     make_request(response_data)
   end
 
   def on_test_case_finished(event)
-    puts "inside on_test_case_finished - #{event}"
+    puts "LOCAL GEM - inside on_test_case_finished - #{event}"
   end
 
   def on_test_step_started(event)
-    puts "inside test_step_started  - #{event}"
+    puts "LOCAL GEM - inside test_step_started  - #{event}"
   end
 
   def on_test_step_finished(event)
-    puts "inside test_step_finished - #{event}"
+    puts "LOCAL GEM - test_step_finished - #{event}"
   end
 
   def on_test_run_finished(event)
-    puts "inside test_run_finished - #{event}"
+    puts "LOCAL GEM - inside test_run_finished - #{event}"
   end
 
   def get_tags_array(tags)
@@ -61,17 +62,37 @@ class Mygem
     scenario.scenario.name
   end
 
-  def create_build_response
-    data = {}
-    data['project_name'] = @runner.get_project_name
-    data['name'] = @runner.get_build_name
-    data['tags'] = @tags_array
-    data
+  # /builds api
+  def create_build_response(time)
+    {
+      'format' => 'json',
+      'project_name' => @runner.get_project_name,
+      'name' => @runner.get_build_name,
+      'description' => @runner.get_description,
+      'start_time' => time,
+      'tags' => @tags_array,
+      'host_info' => @runner.get_host_machine_info,
+      'ci_info' => @runner.get_ci_info,
+      'failed_tests_rerun' => @runner.get_failed_test_rerun,
+      'version_control' => @runner.version_control
+    }
+  end
+
+  # /stop api
+  def create_stop_response()
+  end
+
+  # /events
+  def create_events_response()
   end
 
   def make_request(data)
     data = data.to_json
-    request = "curl -d '#{data}' -H 'Content-Type: application/json' -X POST http://localhost:4000/time"
+    request = "curl -d '#{data}' -H 'Content-Type: application/json' -X POST http://localhost:4000/time --silent"
     `#{request}`
+  end
+
+  def current_time
+    Time.now
   end
 end
