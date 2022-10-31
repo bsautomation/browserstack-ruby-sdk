@@ -1,6 +1,8 @@
+require_relative 'runner'
 
 class Mygem
-  def build_abc(config, ast)
+  def custom_formatter(config, ast)
+    @runner = Runner.new
     @ast_lookup = ast
     %i[test_case_started test_case_finished test_step_started test_step_finished test_run_finished].each do |event_name|
       config.on_event event_name do |event|
@@ -26,9 +28,11 @@ class Mygem
     puts "inside on_test_case_started - #{event}"
     test_case = event.test_case
     scenario = @ast_lookup.scenario_source(test_case)
-    scenario_name = get_scenario_name(scenario)
-    tags_array = get_tags_array(test_case.tags)
-    puts "tags_array - #{tags_array}, scenario_name - ##{scenario_name}"
+    @scenario_name = get_scenario_name(scenario)
+    @tags_array = get_tags_array(test_case.tags)
+    puts "tags_array - #{@tags_array}, scenario_name - #{@scenario_name}"
+    response_data = create_build_response
+    make_request(response_data)
   end
 
   def on_test_case_finished(event)
@@ -55,5 +59,19 @@ class Mygem
 
   def get_scenario_name(scenario)
     scenario.scenario.name
+  end
+
+  def create_build_response
+    data = {}
+    data['project_name'] = @runner.get_project_name
+    data['name'] = @runner.get_build_name
+    data['tags'] = @tags_array
+    data
+  end
+
+  def make_request(data)
+    data = data.to_json
+    request = "curl -d '#{data}' -H 'Content-Type: application/json' -X POST http://localhost:4000/time"
+    `#{request}`
   end
 end

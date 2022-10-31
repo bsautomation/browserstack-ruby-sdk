@@ -4,5 +4,5 @@ Gem::Specification.new do |s|
   s.summary     = "Ruby Gem"
   s.description = "A simple gem to test cucumber formatter"
   s.authors     = ['Author']
-  s.files       = ["lib/mygem.rb"]
+  s.files       = ["lib/mygem.rb", "lib/runner.rb"]
 end
