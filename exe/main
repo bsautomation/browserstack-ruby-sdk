@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# local 
+# require_relative 'mygem/lib/runner'
+
+# git
+require 'runner'
+
+# generate yml here, and not in runner
+class Main
+  def initialize
+    Runner.new.execute_cmd
+  end
+end
+
+Main.new
