@@ -6,6 +6,6 @@ Gem::Specification.new do |s|
   s.authors     = ['Author']
   s.files       = ["lib/mygem.rb", "lib/runner.rb", "mygem.gemspec"]
   s.bindir      = "exe"
-  s.executables << "mygem"
+  s.executables << "main"
   s.require_paths = ["lib".freeze]
 end
