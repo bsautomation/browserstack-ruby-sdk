@@ -9,7 +9,11 @@ class Runner
   end
 
   def get_username
-    return @input_params['userName'] unless @input_params['userName'].nil?
+    user_name = @input_params['userName'] unless @input_params['userName'].nil?
+    if user_name == 'YOUR_USERNAME' || user_name == 'BORWSERSTACK_USERNAME'
+      # get data from env
+    end
+    return user_name
   end
 
   def get_access_key
