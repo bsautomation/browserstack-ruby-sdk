@@ -1,14 +1,24 @@
 #!/usr/bin/env ruby
-# local 
-# require_relative 'mygem/lib/runner'
-
-# git
 require 'runner'
 
-# generate yml here, and not in runner
 class Main
+
   def initialize
-    Runner.new.execute_cmd
+    @args = ARGV
+    if yaml_exist?(Dir.entries('.'))
+      runner = Runner.new
+      runner.execute_cmd(read_args)
+    else
+      puts 'ERROR: YAML is absent'
+    end
+  end
+
+  def read_args
+    @args.join(' ')
+  end
+
+  def yaml_exist?(dir_list)
+    dir_list.include?('browserstack.yaml') || dir_list.include?('browserstack.yml')
   end
 end
 

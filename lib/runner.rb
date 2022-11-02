@@ -4,6 +4,7 @@ require 'socket'
 class Runner
   REPORTER = '--format pretty -f Formatter -o abc.txt'
   def initialize
+    p 'Starting ...'
     @input_params = YAML.load_file('browserstack.yml')
   end
 
@@ -17,16 +18,28 @@ class Runner
 
   def get_platform_params
     return @input_params['platforms'][0] unless @input_params['platforms'].nil?
+
+    ''
   end
 
   def get_build_name
     return @input_params['buildName'] unless @input_params['buildName'].nil?
+
+    ''
   end
 
   def get_project_name
     return @input_params['projectName'] unless @input_params['projectName'].nil?
+
+    ''
   end
-  
+
+  def get_build_tag
+    return @input_params['buildTag'] unless @input_params['buildTag'].nil?
+
+    []
+  end
+
   def get_host_machine_info
     {
       'hostname' => Socket.gethostname,
@@ -38,11 +51,11 @@ class Runner
   end
 
   def get_description
-    'Dummy Description'
+    'Dummy_Description'
   end
 
   def get_ci_info
-    'Dummy Info'
+    {}
   end
 
   def get_failed_test_rerun
@@ -50,14 +63,14 @@ class Runner
   end
 
   def version_control
-    'Dummy Meta Data'
+    {}
+  end
+
+  def execute_cmd(args)
+    exec("#{args} #{REPORTER}")
   end
 
   def create_cmd
     "cucumber BS_USERNAME=#{get_username} BS_AUTHKEY=#{get_access_key} BS_AUTOMATE_OS=#{get_platform_params['os']} BS_AUTOMATE_OS_VERSION=#{get_platform_params['osVersion']} SELENIUM_BROWSER=#{get_platform_params['browserName']} #{REPORTER}"
-  end
-
-  def execute_cmd
-    exec(create_cmd)
   end
 end
