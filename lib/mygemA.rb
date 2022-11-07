@@ -149,7 +149,7 @@ class MygemA
       'test_run' => test_data
     }
     @test_case_finished_data['test_run']['meta'] = $global_obj[uuid]['meta']
-    binding.pry
+    # binding.pry
     uploadEventData(@test_case_finished_data)
   end
 
