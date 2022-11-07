@@ -2,21 +2,19 @@ require_relative 'runner'
 require 'uri'
 require 'json'
 require 'net/http'
+require 'securerandom'
 
-class Mygem
+$global_obj = {}
+
+class MygemB
   API_ENDPOINT = 'testops-collector-stag.us-east-1.elasticbeanstalk.com'.freeze
   BUILDS = '/api/v1/builds'.freeze
 
-  def custom_formatter(config, ast)
+  def custom_formatter(config) #cucumber 3.2
     @runner = Runner.new
-    @ast_lookup = ast
-    %i[gherkin_source_read gherkin_source_parsed test_run_started test_case_started test_case_finished test_step_started test_step_finished test_run_finished].each do |event_name|
+    %i[test_run_started test_case_started test_case_finished test_step_started test_step_finished test_run_finished].each do |event_name|
       config.on_event event_name do |event|
         case event_name
-        when :gherkin_source_read
-          on_gherkin_source_read(event)
-        when :gherkin_source_parsed
-          on_gherkin_source_parsed(event)
         when :test_run_started
           on_test_run_started(event)
         when :test_case_started
@@ -36,45 +34,88 @@ class Mygem
     end
   end
 
-  def on_gherkin_source_read(event)
-    # binding.pry
-  end
-
-  def on_gherkin_source_parsed(event)
-    @feature_name = event.gherkin_document.feature.name
-    # binding.pry
-  end
-
+  # launch api call
   def on_test_run_started(event)
-    puts "Mygem - inside on_test_run_started - #{event}"
     request_data = create_build_request(current_time)
     launchTestSession(request_data)
   end
 
+  # uploadevent api call
   def on_test_case_started(event)
-    # puts "Mygem - inside on_test_case_started - #{event}"
     event_name = 'TestRunStarted'
-    relative_location = event.test_case.location.file
-    @file_name = "#{Dir.pwd}/#{relative_location}"
-    @uuid = event.test_case.id
+    @file_name = "#{Dir.pwd}/#{event.test_case.feature.file}"
+    @uuid = SecureRandom.uuid
+    @feature_name = event.test_case.feature.name
     @scenario_name = event.test_case.name
     @started_at = current_time
+    @step_list = []
     test_data = test_data(event_name)
-    data = {
+    meta = {
+      'feature' => {
+        'path' => @file_name,
+        'name' => @feature_name,
+        'description' => ''
+      },
+      'scenario' => {
+        'name' => @scenario_name
+      },
+      'steps' => []
+    }
+    $global_obj[uniq_id_by_test_case(event)] = { 'test_data' => test_data, 'meta' => meta }
+    @test_case_started_data = {
       'event_type' => event_name,
       'test_run' => test_data
     }
-    uploadEventData(data)
+    uploadEventData(@test_case_started_data)
   end
 
-  def on_test_case_finished(event)
-    # puts "Mygem - inside on_test_case_finished - #{event}"
-    finished_at = current_time
-    event_type = 'TestRunFinished'
-    test_data = test_data(event_type)
+  def on_test_step_started(event)
+    test_step = event.test_step.source.last
+    uniq_id = uniq_id_by_test_step(event)
+
+    if test_step.class.to_s.include? 'Step'
+      step_hash = {
+        'id' => rand(10..99),
+        'text' => test_step.to_s,
+        'keyword' => test_step.keyword,
+        'started_at' => current_time
+      }
+      $global_obj[uniq_id]['meta']['steps'] << step_hash
+      @step_list << step_hash
+    end
+  end
+
+  def on_test_step_finished(event)
+
+    test_step = event.test_step.source.last
+    uniq_id = uniq_id_by_test_step(event)
 
     status = test_result(event.result.to_sym)
-    duration = event.result.duration.nanoseconds.to_i/1000000.to_f
+    duration = get_duration(event, status)
+
+    if test_step.class.to_s.include? 'Step'
+      steps_list = $global_obj[uniq_id]['meta']['steps']
+
+      steps_list.each_with_index do |step, index|
+        if step['text'].include? event.test_step.source.last.to_s
+          steps_list[index]['finished_at'] = current_time
+          steps_list[index]['result'] = status
+          steps_list[index]['duration'] = duration
+          steps_list[index]['failure'] = event.result.exception.message if status == 'failed'
+        end
+      end
+      $global_obj[uniq_id]['meta']['steps'] = steps_list
+    end
+  end
+
+  # upload event api call
+  def on_test_case_finished(event)
+    finished_at = current_time
+    event_type = 'TestRunFinished'
+    uniq_id = uniq_id_by_test_case(event)
+    test_data = $global_obj[uniq_id]['test_data']
+    status = test_result(event.result.to_sym)
+    duration = get_duration(event, status)
     test_result_data = {
       'result' => status,
       'finished_at' => finished_at,
@@ -89,24 +130,18 @@ class Mygem
       }
       test_data = test_data.merge(failure_data)
     end
-    data = {
+    @test_case_finished_data = {
       'event_type' => event_type,
       'test_run' => test_data
     }
-    uploadEventData(data)
+    @test_case_finished_data['test_run']['meta'] = $global_obj[uniq_id]['meta']
+    binding.pry
+    uploadEventData(@test_case_finished_data)
+    
   end
 
-  def on_test_step_started(event)
-    # binding.pry
-    # puts "Mygem - inside test_step_started  - #{event}"
-  end
-
-  def on_test_step_finished(event)
-    # puts "Mygem - test_step_finished - #{event}"
-  end
-
+  # stop api call
   def on_test_run_finished(event)
-    # puts "Mygem - inside test_run_finished - #{event}"
     request_data = create_stop_request(current_time)
     stopBuildUpstream(request_data)
   end
@@ -128,7 +163,6 @@ class Mygem
       'file_name' => @file_name,
       'location' => @file_name,
       'started_at' => @started_at
-      # meta 
     }
   end
 
@@ -142,7 +176,7 @@ class Mygem
       'start_time' => time,
       'tags' => @runner.get_build_tag,
       'host_info' => @runner.get_host_machine_info,
-      # 'ci_info' => @runner.get_ci_info,
+      'ci_info' => @runner.get_ci_info,
       'failed_tests_rerun' => @runner.get_failed_test_rerun,
       # 'version_control' => @runner.version_control
     }
@@ -166,13 +200,11 @@ class Mygem
     response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
       http.request(request)
     end
-    p "/build api failed with #{response.code}" unless response.code == '200'
+    p "/build success status code - #{response.code} body - #{response.body}" if response.code == '200'
+    p "/build api failed with #{response.code}" if response.code != '200'
     response = JSON.parse(response.body)
     @build_hashed_id = response['build_hashed_id']
     @jwt_token = response['jwt']
-    require 'pry'
-    
-    # binding.pry
   end
 
   # /stop api
@@ -189,6 +221,7 @@ class Mygem
     req.body = data
     response = Net::HTTP.new(uri.host, uri.port).start {|http| http.request(req) }
     puts response.code
+    p '/stop success' if response.code == '200'
     p "/stop failed with #{response.code}" if response.code != '200'
   end
 
@@ -212,6 +245,7 @@ class Mygem
     response = Net::HTTP.start(uri.hostname, uri.port, req_options) do |http|
       http.request(request)
     end
+    p "/event success status_code #{response.code}, body #{response.body}" if response.code == '200'
     p "/event failed with #{response.code}" if response.code != '200'
   end
 
@@ -230,7 +264,33 @@ class Mygem
     end
   end
 
+  def get_duration(event, status)
+    if status.include?('skipped') || event.result.duration.instance_of?(Cucumber::Core::Test::Result::UnknownDuration)
+      0
+    else
+      event.result.duration.nanoseconds.to_f/1000000 rescue 0
+    end
+  end
+
   def finished?(event_name)
     event_name.include?('Finished')
+  end
+
+  def uniq_id_by_test_case (event)
+    scenario_object = ''
+    event.test_case.source.each { |element|
+      keyword = element.keyword rescue nil
+      scenario_object = element if !keyword.nil? && keyword.include?('Scenario')
+    }
+    "#{scenario_object.to_s}_#{scenario_object.location.file}_#{scenario_object.location.lines.to_s}"
+  end
+
+  def uniq_id_by_test_step(event)
+    scenario_object = ''
+    event.test_step.source.each { |element|
+      keyword = element.keyword rescue nil
+      scenario_object = element if !keyword.nil? && keyword.include?('Scenario')
+    }
+    "#{scenario_object.to_s}_#{scenario_object.location.file}_#{scenario_object.location.lines.to_s}"
   end
 end

@@ -4,7 +4,7 @@ Gem::Specification.new do |s|
   s.summary     = "Ruby Gem"
   s.description = "A simple gem to test cucumber formatter"
   s.authors     = ['Author']
-  s.files       = ["lib/mygem.rb", "lib/runner.rb", "mygem.gemspec"]
+  s.files       = ["lib/mygemA.rb", "lib/mygemB.rb", "lib/runner.rb", "mygem.gemspec"]
   s.bindir      = "exe"
   s.executables << "main"
   s.require_paths = ["lib".freeze]
